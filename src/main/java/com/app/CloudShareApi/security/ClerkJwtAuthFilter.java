@@ -1,20 +1,25 @@
 package com.app.CloudShareApi.security;
 
-import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.security.PublicKey;
 import java.util.Base64;
+import java.util.Collections;
 
 @Component
 @RequiredArgsConstructor
@@ -28,41 +33,72 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        if (request.getRequestURI().contains("/webhooks")){
+        if (request.getRequestURI().contains("/webhooks") || request.getRequestURI().contains("/public") || request.getRequestURI().contains("/download")){
             filterChain.doFilter(request, response);
+            return;
         }
-        String authHeader = request.getHeader("Authoriszation");
 
-        if (authHeader == null || !authHeader.startsWith("Bearer") ){
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Autherization header missing/invalid");
+        String authHeader = request.getHeader("Authorization");
+
+        // ✅ 1. Check for "Bearer " with a space
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.err.println("--> [JWT Filter Error]: Missing or invalid Authorization header: " + authHeader);
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Authorization header missing/invalid");
             return;
         }
 
         try {
-            String token = authHeader.substring(7);
+            // ✅ 2. Safely extract and trim the token
+            String token = authHeader.substring(7).trim();
             String[] chunks = token.split("\\.");
             if (chunks.length < 3) {
+                System.err.println("--> [JWT Filter Error]: Malformed token. Chunks found = " + chunks.length);
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid Jwt Token format");
                 return;
             }
+
             String headerJson = new String(Base64.getUrlDecoder().decode(chunks[0]));
             ObjectMapper mapper = new ObjectMapper();
             JsonNode headerNode = mapper.readTree(headerJson);
 
             if (!headerNode.has("kid")) {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Token header is missi");
+                System.err.println("--> [JWT Filter Error]: Token header is missing 'kid' property");
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Token header is missing");
                 return;
             }
 
             String kid = headerNode.get("kid").asText();
-
             PublicKey publicKey = jwksProvider.getPublicKey(kid);
 
+            if (publicKey == null) {
+                System.err.println("--> [JWT Filter Error]: Could not find or generate PublicKey for kid: " + kid);
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Public key not found for token");
+                return;
+            }
+
+            // Verify the token
+            Claims claims = Jwts.parser()
+                    .verifyWith(publicKey)
+                    .clockSkewSeconds(60)
+                    .requireIssuer(clerkIssuer)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            String clerkId = claims.getSubject();
+            System.out.println("--> [JWT Filter SUCCESS]: Authenticated User ID: " + clerkId);
+
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                    clerkId, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
+
+            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            filterChain.doFilter(request, response);
+
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            // ✅ 3. Print exact failure to IntelliJ Console
+            System.err.println("--> [JWT Filter FAILED]: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid JWT token: " + e.getMessage());
         }
-
-
-        filterChain.doFilter(request, response);
     }
 }

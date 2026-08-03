@@ -3,12 +3,12 @@ package com.app.CloudShareApi.service;
 import com.app.CloudShareApi.documents.ProfileDocument;
 import com.app.CloudShareApi.dto.ProfileDTO;
 import com.app.CloudShareApi.repository.ProfileRepo;
-import com.mongodb.DuplicateKeyException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -89,6 +89,22 @@ public class ProfileService {
         if (id!=null){
             profileRepo.delete(id);
         }
+    }
+
+    public ProfileDocument getCurrentProfile(){
+        if (SecurityContextHolder.getContext().getAuthentication() == null){
+            throw new UsernameNotFoundException("User not Authenticated");
+        }
+        String clerkId = SecurityContextHolder.getContext().getAuthentication().getName();
+        ProfileDocument profile = profileRepo.findByClerkId(clerkId);
+
+        if (profile == null) {
+            throw new UsernameNotFoundException(
+                    "Profile not found for Clerk ID: " + clerkId
+            );
+        }
+
+        return profile;
     }
 
 }
