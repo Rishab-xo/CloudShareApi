@@ -5,6 +5,10 @@ import com.app.CloudShareApi.documents.ProfileDocument;
 import com.app.CloudShareApi.dto.FileMetaDataDTO;
 import com.app.CloudShareApi.repository.FileMetadataRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -78,12 +82,18 @@ public class FileMetadataService {
                 .build();
     }
 
-    public List<FileMetaDataDTO> getFiles(){
-
+    public Page<FileMetaDataDTO> getFilesPaginated(int page, int size) {
         ProfileDocument currentProfile = profileService.getCurrentProfile();
-        List<FileMetaDataDocument> files = fileMetadataRepo.findByClerkId(currentProfile.getClerkId());
 
-        return files.stream().map(this::mapToDTO).collect(Collectors.toList());
+        // 1. Create the PageRequest (Note: Spring pages are 0-indexed. Page 0 is the first page)
+        // We sort by 'uploadedAt' descending so the newest files show up first
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "uploadedAt"));
+
+        // 2. Fetch the page from MongoDB
+        Page<FileMetaDataDocument> filePage = fileMetadataRepo.findByClerkId(currentProfile.getClerkId(), pageable);
+
+        // 3. Map the Document to DTO (Spring's Page interface does the streaming for you!)
+        return filePage.map(this::mapToDTO);
     }
 
     public FileMetaDataDTO getPublicFile(String id){

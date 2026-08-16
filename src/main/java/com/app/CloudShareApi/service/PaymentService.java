@@ -103,7 +103,7 @@ public class PaymentService {
                 }
                 if (creditsToAdd > 0){
                     userCreditsService.addCredits(clerkId, creditsToAdd, plan);
-                    updateTransactionStaus(request.getRazorpay_order_id(), "SUCCESS", request.getRazorpay_payment_id(), creditsToAdd);
+                    updateTransactionStatus(request.getRazorpay_order_id(), "SUCCESS", request.getRazorpay_payment_id(), creditsToAdd);
                     return PaymentDTO.builder()
                             .success(true)
                             .message("Payment verified and credits added successfully")
@@ -111,9 +111,9 @@ public class PaymentService {
                             .build();
                 }
                 else {
-                    updateTransactionStaus(request.getRazorpay_order_id(), "FAILED", request.getRazorpay_payment_id(), null);
+                    updateTransactionStatus(request.getRazorpay_order_id(), "FAILED", request.getRazorpay_payment_id(), null);
                     return PaymentDTO.builder()
-                            .success(false)
+                            .success(true)
                             .message("Invalid Plan Selected")
                             .credits(null)
                             .build();
@@ -124,7 +124,7 @@ public class PaymentService {
         catch (Exception e) {
 
           try {
-              updateTransactionStaus(request.getRazorpay_order_id(), "ERROR", request.getRazorpay_payment_id(), null);
+              updateTransactionStatus(request.getRazorpay_order_id(), "ERROR", request.getRazorpay_payment_id(), null);
           }
           catch (Exception ex){
               throw new RuntimeException(ex);
@@ -138,20 +138,16 @@ public class PaymentService {
         return null;
     }
 
-    private void updateTransactionStaus(String razorpayOrderId, String status, String razorpayPaymentId, Integer creditsToAdd) {
+    private void updateTransactionStatus(String razorpayOrderId, String status, String razorpayPaymentId, Integer creditsToAdd) {
 
-        paymentTransactionRepo.findAll().stream()
-                .filter(t -> t.getOrderId() != null && t.getOrderId().equals(razorpayOrderId))
-                .findFirst()
-                .map(transaction -> {
-                    transaction.setStatus(status);
-                    transaction.setPaymentId(razorpayPaymentId);
-                    if (creditsToAdd != null){
-                        transaction.setCreditsAdded(creditsToAdd);
-                    }
-                    return paymentTransactionRepo.save(transaction);
-                })
-                .orElse(null);
+        paymentTransactionRepo.findByOrderId(razorpayOrderId).ifPresent(transaction -> {
+            transaction.setStatus(status);
+            transaction.setPaymentId(razorpayPaymentId);
+            if (creditsToAdd != null) {
+                transaction.setCreditsAdded(creditsToAdd);
+            }
+            paymentTransactionRepo.save(transaction);
+        });
 
     }
 
