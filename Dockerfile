@@ -1,15 +1,13 @@
-# Use a lightweight Java runtime image
-FROM eclipse-temurin:21-jdk
-
-# Set the working directory inside the container
+# Stage 1: Compile and build the JAR using Maven
+FROM maven:3.9.8-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Copy the compiled JAR file from your target folder into the container
-# The wildcard (*) ensures it grabs the JAR regardless of the exact version number
-COPY target/*.jar app.jar
-
-# Expose the port your Spring Boot app runs on
+# Stage 2: Run the application
+FROM eclipse-temurin:21-jdk
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-
-# The command to run when the container starts
 ENTRYPOINT ["java", "-jar", "app.jar"]
