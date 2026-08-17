@@ -30,6 +30,12 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
 
     private final ClerkJwksProvider jwksProvider;
 
+    // ✅ Tell the filter to completely ignore CORS preflight requests
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "OPTIONS".equalsIgnoreCase(request.getMethod());
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
