@@ -4,7 +4,9 @@ import com.app.CloudShareApi.documents.FileMetaDataDocument;
 import com.app.CloudShareApi.documents.ProfileDocument;
 import com.app.CloudShareApi.dto.FileMetaDataDTO;
 import com.app.CloudShareApi.repository.FileMetadataRepo;
+import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +34,11 @@ public class FileMetadataService {
     private final ProfileService profileService;
     private final UserCreditsService userCreditsService;
     private final FileMetadataRepo fileMetadataRepo;
+
+    @Value("${minio.bucket-name}")
+    private String bucketName;
+
+    private final MinioClient minioClient;
 
     public List<FileMetaDataDTO> uploadFiles(MultipartFile files[]) throws IOException {
         ProfileDocument currentProfile = profileService.getCurrentProfile();
