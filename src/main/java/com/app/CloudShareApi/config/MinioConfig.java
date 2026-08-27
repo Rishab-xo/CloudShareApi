@@ -23,6 +23,7 @@ public class MinioConfig {
        return MinioClient.builder()
                .endpoint(endpoint)
                .credentials(accessKey,secretKey)
+               .region("us-east-1") // Explicitly set the region for Filebase S3
                .build();
     }
 
