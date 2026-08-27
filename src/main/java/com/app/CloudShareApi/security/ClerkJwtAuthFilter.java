@@ -39,6 +39,8 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
+        System.out.println("--> [TRIPWIRE] Request reached the filter for URL: " + request.getRequestURI());
+
         if (request.getRequestURI().contains("/webhooks") || request.getRequestURI().contains("/public") || request.getRequestURI().contains("/download")){
             filterChain.doFilter(request, response);
             return;
