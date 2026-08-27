@@ -115,42 +115,42 @@ public class CloudFileService {
         return file;
     }
 
-    @PostConstruct
-    public void initBucket() {
-        try {
-            // 1. Check if the bucket exists. If not, create it.
-            boolean found = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
-            if (!found) {
-                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
-            }
-
-            // 2. Tell MinIO to make this bucket PUBLIC for downloading
-            String policy = """
-                    {
-                      "Version": "2012-10-17",
-                      "Statement": [
-                        {
-                          "Effect": "Allow",
-                          "Principal": "*",
-                          "Action": "s3:GetObject",
-                          "Resource": "arn:aws:s3:::%s/*"
-                        }
-                      ]
-                    }
-                    """.formatted(bucketName);
-
-            minioClient.setBucketPolicy(
-                    SetBucketPolicyArgs.builder()
-                            .bucket(bucketName)
-                            .config(policy)
-                            .build()
-            );
-
-            System.out.println("MinIO Bucket ready and set to PUBLIC!");
-
-        } catch (Exception e) {
-            System.err.println("Could not initialize bucket: " + e.getMessage());
-        }
-    }
+//    @PostConstruct
+//    public void initBucket() {
+//        try {
+//            // 1. Check if the bucket exists. If not, create it.
+//            boolean found = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
+//            if (!found) {
+//                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
+//            }
+//
+//            // 2. Tell MinIO to make this bucket PUBLIC for downloading
+//            String policy = """
+//                    {
+//                      "Version": "2012-10-17",
+//                      "Statement": [
+//                        {
+//                          "Effect": "Allow",
+//                          "Principal": "*",
+//                          "Action": "s3:GetObject",
+//                          "Resource": "arn:aws:s3:::%s/*"
+//                        }
+//                      ]
+//                    }
+//                    """.formatted(bucketName);
+//
+//            minioClient.setBucketPolicy(
+//                    SetBucketPolicyArgs.builder()
+//                            .bucket(bucketName)
+//                            .config(policy)
+//                            .build()
+//            );
+//
+//            System.out.println("MinIO Bucket ready and set to PUBLIC!");
+//
+//        } catch (Exception e) {
+//            System.err.println("Could not initialize bucket: " + e.getMessage());
+//        }
+//    }
 
 }
