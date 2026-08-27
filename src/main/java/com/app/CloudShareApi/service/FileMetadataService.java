@@ -45,19 +45,30 @@ public class FileMetadataService {
         List<FileMetaDataDocument> savedFiles = new ArrayList<>();
 
         if (!userCreditsService.hasEnoughCredits(files.length)){
-            throw new RuntimeException("Not enough credits too upload files. please purchase");
+            throw new RuntimeException("Not enough credits to upload files. please purchase");
         }
 
-        Path uploadPath = Paths.get("upload").toAbsolutePath().normalize();
-        Files.createDirectories(uploadPath);
-
         for (MultipartFile file : files){
-            String fileName = UUID.randomUUID() + "." + StringUtils.getFilenameExtension(file.getOriginalFilename());
-            Path targetLocation = uploadPath.resolve(fileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            // Generate a unique file name
+            String fileName = UUID.randomUUID() + "-" + file.getOriginalFilename();
 
+            try {
+                // 1. UPLOAD DIRECTLY TO FILEBASE (S3) INSTEAD OF LOCAL DISK
+                minioClient.putObject(
+                        io.minio.PutObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(fileName)
+                                .stream(file.getInputStream(), file.getSize(), -1)
+                                .contentType(file.getContentType())
+                                .build()
+                );
+            } catch (Exception e) {
+                throw new RuntimeException("Error uploading to Cloud Storage: " + e.getMessage());
+            }
+
+            // 2. SAVE METADATA TO MONGODB
             FileMetaDataDocument fileMetadata = FileMetaDataDocument.builder()
-                    .fileLocation(targetLocation.toString())
+                    .fileLocation(fileName) // Just store the object key so you can retrieve it later
                     .name(file.getOriginalFilename())
                     .size(file.getSize())
                     .type(file.getContentType())
@@ -67,13 +78,10 @@ public class FileMetadataService {
                     .build();
 
             userCreditsService.consumeCredit();
-
             savedFiles.add(fileMetadataRepo.save(fileMetadata));
         }
 
-     return savedFiles.stream().map(fileMetaDataDocument -> mapToDTO(fileMetaDataDocument))
-                .collect(Collectors.toList());
-
+        return savedFiles.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
     private FileMetaDataDTO mapToDTO(FileMetaDataDocument fileMetaDataDocument) {
