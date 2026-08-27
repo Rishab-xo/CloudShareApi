@@ -129,19 +129,26 @@ public class FileMetadataService {
     public void deleteFile(String id){
         try {
             ProfileDocument currentProfile = profileService.getCurrentProfile();
-            FileMetaDataDocument file = fileMetadataRepo.findById(id).orElseThrow(()-> new RuntimeException("File not found"));
+            FileMetaDataDocument file = fileMetadataRepo.findById(id)
+                    .orElseThrow(() -> new RuntimeException("File not found"));
 
             if (!file.getClerkId().equals(currentProfile.getClerkId())){
                 throw new RuntimeException("File does not belong to Current User");
             }
 
-            Path path = Paths.get(file.getFileLocation());
-            Files.deleteIfExists(path);
+            // Delete from Filebase (S3)
+            minioClient.removeObject(
+                    io.minio.RemoveObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(file.getFileLocation())
+                            .build()
+            );
+
+            // Delete from MongoDB
             fileMetadataRepo.deleteById(id);
 
-        }
-        catch (Exception e){
-            throw new RuntimeException("Error deleting the File");
+        } catch (Exception e){
+            throw new RuntimeException("Error deleting the File: " + e.getMessage());
         }
     }
 
