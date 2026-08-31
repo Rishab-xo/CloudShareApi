@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,26 +26,27 @@ public class FileController {
     private final CloudFileService cloudFileService;
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadFiles(@RequestPart MultipartFile files[], java.security.Principal principal) throws Exception {
-        Map response = new HashMap<>();
+    public ResponseEntity<?> uploadFiles(@RequestParam("files") MultipartFile[] files, Principal principal) {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            String ownerId = principal.getName();
 
-        // 1. Get the secure User ID from the JWT token
-        String ownerId = principal.getName();
+            List<CloudFile> uploadedFiles = new ArrayList<>();
+            for (MultipartFile file : files) {
+                CloudFile savedFile = cloudFileService.uploadFile(file, ownerId);
+                uploadedFiles.add(savedFile);
+            }
 
-        // 2. Upload every file to MinIO using our new service
-        List<CloudFile> uploadedFiles = new java.util.ArrayList<>();
-        for (MultipartFile file : files) {
-            CloudFile savedFile = cloudFileService.uploadFile(file, ownerId);
-            uploadedFiles.add(savedFile);
+            UserCredits finalCredits = userCreditsService.getUserCredits();
+            response.put("files", uploadedFiles);
+            response.put("remainingCredits", finalCredits);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Upload failed: " + e.getMessage()));
         }
-
-        // 3. Keep your existing credits logic intact
-        UserCredits FinalCredits = userCreditsService.getUserCredits();
-
-        response.put("files", uploadedFiles);
-        response.put("remainingCredits", FinalCredits);
-
-        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/my")
