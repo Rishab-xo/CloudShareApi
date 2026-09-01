@@ -17,14 +17,15 @@ public class MinioConfig {
     @Value("${minio.secret-key}")
     private String secretKey;
 
+    @Value("${minio.region}") // Add this new value!
+    private String region;
+
     @Bean
     public MinioClient minioClient(){
-
-       return MinioClient.builder()
-               .endpoint(endpoint)
-               .credentials(accessKey,secretKey)
-               .region("us-east-1") // Explicitly set the region for Filebase S3
-               .build();
+        return MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(accessKey, secretKey)
+                .region(region) // Pass the AWS region here
+                .build();
     }
-
 }
