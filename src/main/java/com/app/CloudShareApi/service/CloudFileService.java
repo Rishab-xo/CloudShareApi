@@ -21,6 +21,8 @@ public class CloudFileService {
 
     private final MinioClient minioClient;
     private final CloudFileRepo cloudFileRepo;
+    // 1. Inject the credits service
+    private final UserCreditsService userCreditsService;
 
     @Value("${minio.endpoint}")
     private String endpoint;
@@ -32,12 +34,15 @@ public class CloudFileService {
     private String region;
 
     public CloudFile uploadFile(MultipartFile file, String ownerId) throws Exception {
-        String originalFileName = file.getOriginalFilename();
+        // 2. Pre-check: Stop the upload immediately if they have 0 credits
+        if (!userCreditsService.hasEnoughCredits(1)) {
+            throw new RuntimeException("Insufficient credits to upload this file.");
+        }
 
-        // 1. Generate a unique name to prevent collisions
+        String originalFileName = file.getOriginalFilename();
         String objectKey = UUID.randomUUID().toString() + "-" + originalFileName;
 
-        // 2. Stream the file directly into AWS S3
+        // Stream the file directly into AWS S3
         try (InputStream inputStream = file.getInputStream()) {
             minioClient.putObject(
                     PutObjectArgs.builder()
@@ -49,7 +54,11 @@ public class CloudFileService {
             );
         }
 
-        // 3. Save file metadata to MongoDB
+        // 3. Consume the credit ONLY AFTER a successful AWS upload
+        // This ensures users aren't charged for failed uploads
+        userCreditsService.consumeCredit();
+
+        // Save file metadata to MongoDB
         CloudFile cloudFile = new CloudFile();
         cloudFile.setOriginalFileName(originalFileName);
         cloudFile.setObjectKey(objectKey);
@@ -57,7 +66,6 @@ public class CloudFileService {
         cloudFile.setSize(file.getSize());
         cloudFile.setOwnerId(ownerId);
 
-        // Direct S3 Virtual-Hosted download URL
         String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, objectKey);
         cloudFile.setUrl(fileUrl);
 
@@ -76,7 +84,6 @@ public class CloudFileService {
             throw new RuntimeException("Unauthorized to delete this file");
         }
 
-        // Delete the object from AWS S3
         minioClient.removeObject(
                 RemoveObjectArgs.builder()
                         .bucket(bucketName)
