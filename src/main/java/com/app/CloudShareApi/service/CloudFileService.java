@@ -67,8 +67,16 @@ public class CloudFileService {
         cloudFile.setSize(file.getSize());
         cloudFile.setOwnerId(ownerId);
 
-        String effectiveRegion = (region != null && !region.isBlank()) ? region : "us-east-1";
-        String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, effectiveRegion, objectKey);
+        String fileUrl;
+        if (endpoint != null && endpoint.contains("amazonaws.com")) {
+            String effectiveRegion = (region != null && !region.isBlank()) ? region : "us-east-1";
+            fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, effectiveRegion, objectKey);
+        } else if (endpoint != null && !endpoint.isBlank()) {
+            String cleanEndpoint = endpoint.replaceAll("/+$", "");
+            fileUrl = String.format("%s/%s/%s", cleanEndpoint, bucketName, objectKey);
+        } else {
+            fileUrl = String.format("https://%s.s3.amazonaws.com/%s", bucketName, objectKey);
+        }
         cloudFile.setUrl(fileUrl);
 
         return cloudFileRepo.save(cloudFile);
