@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -66,6 +67,7 @@ public class CloudFileService {
         cloudFile.setContentType(file.getContentType());
         cloudFile.setSize(file.getSize());
         cloudFile.setOwnerId(ownerId);
+        cloudFile.setPublic(true);
 
         String fileUrl;
         if (endpoint != null && endpoint.contains("amazonaws.com")) {
@@ -83,7 +85,7 @@ public class CloudFileService {
     }
 
     public Page<CloudFile> getUserFiles(String ownerId, int pageNo, int pageSize) {
-        return cloudFileRepo.findByOwnerId(ownerId, PageRequest.of(pageNo, pageSize));
+        return cloudFileRepo.findByOwnerId(ownerId, PageRequest.of(pageNo, pageSize, Sort.by(Sort.Direction.DESC, "uploadedAt")));
     }
 
     public void deleteFile(String fileId, String ownerId) throws Exception {

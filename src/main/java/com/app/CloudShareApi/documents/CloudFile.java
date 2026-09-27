@@ -20,5 +20,5 @@ public class CloudFile {
     private Long size;
     private String ownerId;
     private LocalDateTime uploadedAt = LocalDateTime.now();
-    private boolean isPublic = false;
+    private boolean isPublic = true;
 }
