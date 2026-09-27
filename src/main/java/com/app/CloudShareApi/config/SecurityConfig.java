@@ -37,12 +37,10 @@ public class SecurityConfig {
     @Order(1) // Highest priority: Spring checks this chain first
     public SecurityFilterChain webhookFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher("/webhooks/**", "/files/public/**", "/files/download/**") // This chain exclusively handles webhooks
+                .securityMatcher("/webhooks/**", "/files/public/**") // Handles webhooks and public file access
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
-
-        // Notice: We intentionally DO NOT add the clerkJwtAuthFilter here.
 
         return http.build();
     }
@@ -65,6 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         // 2. EXPLICITLY allow all OPTIONS (preflight) requests to pass without authentication
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/files/download/**").permitAll()
                         .anyRequest().authenticated() )
                 .addFilterBefore(clerkJwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

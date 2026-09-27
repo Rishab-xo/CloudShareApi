@@ -2,6 +2,7 @@ package com.app.CloudShareApi.service;
 
 import com.app.CloudShareApi.documents.CloudFile;
 import com.app.CloudShareApi.repository.CloudFileRepo;
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
@@ -30,7 +31,7 @@ public class CloudFileService {
     @Value("${minio.bucket-name}")
     private String bucketName;
 
-    @Value("${minio.region}")
+    @Value("${minio.region:us-east-1}")
     private String region;
 
     public CloudFile uploadFile(MultipartFile file, String ownerId) throws Exception {
@@ -66,7 +67,8 @@ public class CloudFileService {
         cloudFile.setSize(file.getSize());
         cloudFile.setOwnerId(ownerId);
 
-        String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, objectKey);
+        String effectiveRegion = (region != null && !region.isBlank()) ? region : "us-east-1";
+        String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, effectiveRegion, objectKey);
         cloudFile.setUrl(fileUrl);
 
         return cloudFileRepo.save(cloudFile);
@@ -115,5 +117,25 @@ public class CloudFileService {
         }
 
         return file;
+    }
+
+    public CloudFile getFileForDownload(String fileId, String ownerId) {
+        CloudFile file = cloudFileRepo.findById(fileId)
+                .orElseThrow(() -> new RuntimeException("File not found"));
+
+        if (!file.isPublic() && (ownerId == null || !file.getOwnerId().equals(ownerId))) {
+            throw new RuntimeException("Unauthorized to access this private file");
+        }
+
+        return file;
+    }
+
+    public InputStream getFileInputStream(String objectKey) throws Exception {
+        return minioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectKey)
+                        .build()
+        );
     }
 }

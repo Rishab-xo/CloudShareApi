@@ -6,11 +6,16 @@ import com.app.CloudShareApi.service.CloudFileService;
 import com.app.CloudShareApi.service.UserCreditsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -67,6 +72,69 @@ public class FileController {
             return ResponseEntity.ok(file);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/download/{id}")
+    public ResponseEntity<?> downloadFile(@PathVariable String id, Principal principal) {
+        try {
+            String ownerId = (principal != null) ? principal.getName() : null;
+            CloudFile file = cloudFileService.getFileForDownload(id, ownerId);
+            InputStream stream = cloudFileService.getFileInputStream(file.getObjectKey());
+
+            MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            if (file.getContentType() != null && !file.getContentType().isBlank()) {
+                try {
+                    mediaType = MediaType.parseMediaType(file.getContentType());
+                } catch (Exception ignored) {}
+            }
+
+            String filename = (file.getOriginalFileName() != null && !file.getOriginalFileName().isBlank())
+                    ? file.getOriginalFileName() : "file";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(mediaType);
+            headers.setContentDisposition(ContentDisposition.inline().filename(filename).build());
+            if (file.getSize() != null && file.getSize() > 0) {
+                headers.setContentLength(file.getSize());
+            }
+            headers.setCacheControl("max-age=3600");
+
+            return new ResponseEntity<>(new InputStreamResource(stream), headers, HttpStatus.OK);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Could not download file: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/public/{id}/download")
+    public ResponseEntity<?> downloadPublicFile(@PathVariable String id) {
+        try {
+            CloudFile file = cloudFileService.getPublicFile(id);
+            InputStream stream = cloudFileService.getFileInputStream(file.getObjectKey());
+
+            MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            if (file.getContentType() != null && !file.getContentType().isBlank()) {
+                try {
+                    mediaType = MediaType.parseMediaType(file.getContentType());
+                } catch (Exception ignored) {}
+            }
+
+            String filename = (file.getOriginalFileName() != null && !file.getOriginalFileName().isBlank())
+                    ? file.getOriginalFileName() : "file";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(mediaType);
+            headers.setContentDisposition(ContentDisposition.inline().filename(filename).build());
+            if (file.getSize() != null && file.getSize() > 0) {
+                headers.setContentLength(file.getSize());
+            }
+            headers.setCacheControl("max-age=3600");
+
+            return new ResponseEntity<>(new InputStreamResource(stream), headers, HttpStatus.OK);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Could not download public file: " + e.getMessage());
         }
     }
 

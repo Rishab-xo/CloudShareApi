@@ -41,15 +41,18 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
 
         System.out.println("--> [TRIPWIRE] Request reached the filter for URL: " + request.getRequestURI());
 
-        if (request.getRequestURI().contains("/webhooks") || request.getRequestURI().contains("/public") || request.getRequestURI().contains("/download")){
-            filterChain.doFilter(request, response);
-            return;
-        }
+        boolean isPermitAllUri = request.getRequestURI().contains("/webhooks") 
+                || request.getRequestURI().contains("/public") 
+                || request.getRequestURI().contains("/download");
 
         String authHeader = request.getHeader("Authorization");
 
-        // ✅ 1. Check for "Bearer " with a space
+        // If no Authorization header is present on public/download/webhook endpoints, proceed anonymously
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            if (isPermitAllUri) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             System.err.println("--> [JWT Filter Error]: Missing or invalid Authorization header: " + authHeader);
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Authorization header missing/invalid");
             return;
